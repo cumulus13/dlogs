@@ -29,6 +29,7 @@ KEYWORD_LEVELS = {
     "hint": "notice",
     "notice": "notice",
     "alert": "alert",
+    "failed": "alert",
     "emergency": "emergency",
     "debug": "debug",
 }
