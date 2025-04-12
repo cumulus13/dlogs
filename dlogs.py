@@ -6,7 +6,6 @@ from rich.text import Text
 
 console = Console()
 
-# Style map for detected levels
 LEVEL_STYLES = {
     "info": "bright_cyan",
     "debug": "black on orange3",
@@ -18,7 +17,6 @@ LEVEL_STYLES = {
     "critical": "black on green",
 }
 
-# Keywords to fallback match for severity
 KEYWORD_LEVELS = {
     "fatal": "critical",
     "panic": "emergency",
@@ -35,9 +33,7 @@ KEYWORD_LEVELS = {
     "debug": "debug",
 }
 
-# Regex patterns
-PATTERN_TIMESTAMP_T = re.compile(r"\bt=([0-9T:+.-]+)")
-PATTERN_TIMESTAMP_TIME = re.compile(r"\btime=([0-9T:+.-]+Z?)")
+PATTERN_TIMESTAMP = re.compile(r"\b(?:t|ts|time)=([0-9T:.+-]+Z?)")
 PATTERN_LEVEL = re.compile(r"\blevel=(\w+)", re.IGNORECASE)
 PATTERN_LOGGER = re.compile(r"\blogger=([^\s]+)")
 PATTERN_CALLER = re.compile(r"\b(?:caller|source)=([^\s]+)")
@@ -52,14 +48,13 @@ def infer_level_from_text(text: str) -> str | None:
 
 
 def extract_timestamp(text: str) -> str:
-    match = PATTERN_TIMESTAMP_T.search(text) or PATTERN_TIMESTAMP_TIME.search(text)
+    match = PATTERN_TIMESTAMP.search(text)
     if match:
         try:
             dt = datetime.fromisoformat(match.group(1).replace("Z", "+00:00"))
             return dt.strftime("%Y/%m/%d %H:%M:%S.%f")
         except Exception:
             return match.group(1)
-    # Fallback: PostgreSQL-style date
     match = PATTERN_DATE_FALLBACK.search(text)
     if match:
         try:
@@ -71,7 +66,6 @@ def extract_timestamp(text: str) -> str:
 
 
 def format_line(line: str) -> Text:
-    # Separate app name and content
     parts = line.strip().split("|", 1)
     if len(parts) == 2:
         app_name = parts[0].strip()
@@ -80,7 +74,7 @@ def format_line(line: str) -> Text:
         app_name = line.strip().split(":")[0].strip()
         content = line.strip()
 
-    # Extract fields
+    # Extract metadata
     timestamp = extract_timestamp(content)
     logger = PATTERN_LOGGER.search(content)
     caller = PATTERN_CALLER.search(content)
@@ -91,8 +85,9 @@ def format_line(line: str) -> Text:
     logger_val = logger.group(1) if logger else "-"
     caller_val = caller.group(1) if caller else "-"
 
-    # Remove known keys to avoid duplicate info in message
-    clean_msg = re.sub(r"\b(?:logger|caller|source|level|t|time)=\S+", "", content).strip()
+    # Only remove known metadata keys, but keep ts/time/etc. for output
+    # clean_msg = re.sub(r"\b(logger|caller|source|level)=\S+", "", content).strip()
+    clean_msg = re.sub(r"\b(logger|caller|source|level|ts|t|time)=\S+", "", content).strip()
 
     output = f"{timestamp} {app_name}:{logger_val} {caller_val} {clean_msg}"
     return Text(output, style=style)
