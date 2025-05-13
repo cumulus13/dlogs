@@ -3,6 +3,13 @@ import re
 from datetime import datetime
 from rich.console import Console
 from rich.text import Text
+from configset import configset
+from pathlib import Path
+import syslogx
+
+CONFIGFILE = str(Path(__file__).parent / 'dlogs.ini')
+CONFIG = configset(CONFIGFILE)
+EXCEPTIONS = CONFIG.get_config_as_list("exceptions", 'apps')
 
 console = Console()
 
@@ -89,9 +96,12 @@ def format_line(line: str) -> Text:
     # Only remove known metadata keys, but keep ts/time/etc. for output
     # clean_msg = re.sub(r"\b(logger|caller|source|level)=\S+", "", content).strip()
     clean_msg = re.sub(r"\b(logger|caller|source|level|ts|t|time)=\S+", "", content).strip()
-
-    output = f"{timestamp} {app_name}:{logger_val} {caller_val} {clean_msg}"
-    return Text(output, style=style)
+    check = list(filter(lambda x: x in EXCEPTIONS, [app_name]))
+    # print("check", check)
+    if not check:
+        output = f"{timestamp} {app_name}:{logger_val} {caller_val} {clean_msg}"
+        return Text(output, style=style)
+    return 
 
 
 def tail_docker_logs():
@@ -105,7 +115,7 @@ def tail_docker_logs():
     try:
         for line in process.stdout:
             if line.strip():
-                console.print(format_line(line))
+                console.print(format_line(line)) if format_line(line) else None
     except KeyboardInterrupt:
         process.terminate()
         console.print("[bold yellow]Stopped tailing logs.[/bold yellow]")
